@@ -3,28 +3,17 @@ import gzip
 import pickle
 from collections import Counter
 from pathlib import Path
-
 import inverted_index_colab
-from flask import Flask, request, jsonify
 import wikipedia
+from contextlib import closing
 
 
-class MyFlaskApp(Flask):
-    def run(self, host=None, port=None, debug=None, **options):
-        super(MyFlaskApp, self).run(host=host, port=port, debug=debug, **options)
-
-
-app = MyFlaskApp(__name__)
-app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
-
-
-@app.route("/search")
-def search():
-    ''' Returns up to a 100 of your best search results for the query. This is 
+def search(query):
+    ''' Returns up to a 100 of your best search results for the query. This is
         the place to put forward your best search engine, and you are free to
-        implement the retrieval whoever you'd like within the bound of the 
+        implement the retrieval whoever you'd like within the bound of the
         project requirements (efficiency, quality, etc.). That means it is up to
-        you to decide on whether to use stemming, remove stopwords, use 
+        you to decide on whether to use stemming, remove stopwords, use
         PageRank, query expansion, etc.
         To issue a query navigate to a URL like:
          http://YOUR_SERVER_DOMAIN/search?query=hello+world
@@ -32,65 +21,59 @@ def search():
         if you're using ngrok on Colab or your external IP on GCP.
     Returns:
     --------
-        list of up to 100 search results, ordered from best to worst where each 
+        list of up to 100 search results, ordered from best to worst where each
         element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
-    res = [tuple('Anarchism')]
     # END SOLUTION
-    return jsonify(res)
+    return res
 
 
-@app.route("/search_body")
-def search_body():
+def search_body(query):
     ''' Returns up to a 100 search results for the query using TFIDF AND COSINE
-        SIMILARITY OF THE BODY OF ARTICLES ONLY. DO NOT use stemming. DO USE the 
-        staff-provided tokenizer from Assignment 3 (GCP part) to do the 
-        tokenization and remove stopwords. 
+        SIMILARITY OF THE BODY OF ARTICLES ONLY. DO NOT use stemming. DO USE the
+        staff-provided tokenizer from Assignment 3 (GCP part) to do the
+        tokenization and remove stopwords.
         To issue a query navigate to a URL like:
          http://YOUR_SERVER_DOMAIN/search_body?query=hello+world
         where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
         if you're using ngrok on Colab or your external IP on GCP.
     Returns:
     --------
-        list of up to 100 search results, ordered from best to worst where each 
+        list of up to 100 search results, ordered from best to worst where each
         element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     # END SOLUTION
-    return jsonify(res)
+    return res
 
 
-@app.route("/search_title")
-def search_title():
-    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD 
-        IN THE TITLE of articles, ordered in descending order of the NUMBER OF 
-        QUERY WORDS that appear in the title. For example, a document with a 
-        title that matches two of the query words will be ranked before a 
-        document with a title that matches only one query term. 
+def search_title(query):
+    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
+        IN THE TITLE of articles, ordered in descending order of the NUMBER OF
+        QUERY WORDS that appear in the title. For example, a document with a
+        title that matches two of the query words will be ranked before a
+        document with a title that matches only one query term.
         Test this by navigating to the a URL like:
          http://YOUR_SERVER_DOMAIN/search_title?query=hello+world
         where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
         if you're using ngrok on Colab or your external IP on GCP.
     Returns:
     --------
-        list of ALL (not just top 100) search results, ordered from best to 
+        list of ALL (not just top 100) search results, ordered from best to
         worst where each element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     posting_lists = get_posting_lists(query, 'index_title', base_dir='drive/MyDrive/Test Data/title_index')
@@ -98,30 +81,29 @@ def search_title():
     res = list(map(lambda x: tuple((x[0], wikipedia.page(pageid=x[0], auto_suggest=True, redirect=True).title)), posting_lists))
 
     # END SOLUTION
-    return jsonify(res)
+    return res
 
 
-@app.route("/search_anchor")
-def search_anchor():
-    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD 
-        IN THE ANCHOR TEXT of articles, ordered in descending order of the 
-        NUMBER OF QUERY WORDS that appear in anchor text linking to the page. 
-        For example, a document with a anchor text that matches two of the 
-        query words will be ranked before a document with anchor text that 
-        matches only one query term. 
+def search_anchor(query):
+    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
+        IN THE ANCHOR TEXT of articles, ordered in descending order of the
+        NUMBER OF QUERY WORDS that appear in anchor text linking to the page.
+        For example, a document with a anchor text that matches two of the
+        query words will be ranked before a document with anchor text that
+        matches only one query term.
         Test this by navigating to the a URL like:
          http://YOUR_SERVER_DOMAIN/search_anchor?query=hello+world
         where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
         if you're using ngrok on Colab or your external IP on GCP.
     Returns:
     --------
-        list of ALL (not just top 100) search results, ordered from best to 
+        list of ALL (not just top 100) search results, ordered from best to
         worst where each element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        return res
+
     # BEGIN SOLUTION
 
     posting_lists = get_posting_lists(query, 'index_anchor', base_dir='drive/MyDrive/Test Data/anchor_index')
@@ -130,12 +112,10 @@ def search_anchor():
 
     # END SOLUTION
 
-    return jsonify(res)
+    return res
 
-
-@app.route("/get_pagerank", methods=['POST'])
-def get_pagerank():
-    ''' Returns PageRank values for a list of provided wiki article IDs. 
+def get_pagerank(wiki_ids):
+    ''' Returns PageRank values for a list of provided wiki article IDs.
         Test this by issuing a POST request to a URL like:
           http://YOUR_SERVER_DOMAIN/get_pagerank
         with a json payload of the list of article ids. In python do:
@@ -149,11 +129,9 @@ def get_pagerank():
           list of PageRank scores that correrspond to the provided article IDs.
     '''
     res = []
-    wiki_ids = request.get_json()
     if len(wiki_ids) == 0:
-        return jsonify(res)
+        return res
     # BEGIN SOLUTION
-
     page_rank = {}
     fileName = 'drive/MyDrive/Test Data/page_rank.csv.gz'
     with gzip.open(fileName, "rt") as csvFile:
@@ -165,11 +143,11 @@ def get_pagerank():
     res.sort(key=lambda x: x[1], reverse=True)
 
     # END SOLUTION
-    return jsonify(res)
+    # return (id, page rank)
+    return res
 
 
-@app.route("/get_pageview", methods=['POST'])
-def get_pageview():
+def get_pageview(wiki_ids):
     ''' Returns the number of page views that each of the provide wiki articles
         had in August 2021.
         Test this by issuing a POST request to a URL like:
@@ -182,13 +160,12 @@ def get_pageview():
     Returns:
     --------
         list of ints:
-          list of page view numbers from August 2021 that correrspond to the 
+          list of page view numbers from August 2021 that correrspond to the
           provided list article IDs.
     '''
     res = []
-    wiki_ids = request.get_json()
     if len(wiki_ids) == 0:
-        return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     fileName = 'drive/MyDrive/Test Data/pv/pageviews-202108-user.pkl'
@@ -201,7 +178,8 @@ def get_pageview():
     res.sort(key=lambda x: float(x[1]), reverse=True)
 
     # END SOLUTION
-    return jsonify(res)
+    # return (id, page view)
+    return res
 
 
 def get_posting_lists(query, index_name, base_dir=''):
