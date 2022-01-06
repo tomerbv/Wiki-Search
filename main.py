@@ -12,12 +12,12 @@ def test_page_view():
         wid2pv = pickle.loads(f.read())
     data_items = wid2pv.items()
     data_list = list(data_items)
-    print(data_list[:100])
+    print(max(data_list,key=lambda x: x[0]))
     print(f"total time: {time.time() - t}")
     print(len(data_list))
 
 
-test_page_view()
+# test_page_view()
 
 def test_page_rank():
     t = time.time()
@@ -30,12 +30,13 @@ def test_page_rank():
             page_rank[int(row[0])] = (float(row[1]))
 
 
-    res = list(map(lambda x: (x, page_rank[x]) if x in page_rank else (x, 0), wiki_ids))
-    print(res)
+    res = list(page_rank.items())
+    print(max(res,key=lambda x: x[0]))
+    print(len(res))
     print(page_rank[int(row[0])])
     print(time.time() - t)
 
-# test_page_rank()
+test_page_rank()
 
 def test_doc_index():
     t = time.time()
