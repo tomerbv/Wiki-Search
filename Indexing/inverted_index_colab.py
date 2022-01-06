@@ -104,6 +104,14 @@ class InvertedIndex:
       self.df[w] = self.df.get(w, 0) + 1
       self._posting_list[w].append((doc_id, cnt))
 
+  def get_doc_len(self, doc_id):
+    """ Adds a document to the index with a given `doc_id` and tokens. It counts
+        the tf of tokens, then update the index (in memory, no storage
+        side-effects).
+    """
+
+    self._posting_list[w].append((doc_id, cnt))
+
   def write_index(self, base_dir, name):
     """ Write the in-memory index to disk. Results in the file: 
         (1) `name`.pkl containing the global term stats (e.g. df).

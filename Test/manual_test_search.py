@@ -1,5 +1,7 @@
 import csv
 import gzip
+import json
+import math
 import pickle
 from collections import Counter
 from pathlib import Path
@@ -48,12 +50,34 @@ def search_body(query):
         element is a tuple (wiki_id, title).
     '''
     res = []
+    N = 6348910
     if len(query) == 0:
         return res
     # BEGIN SOLUTION
 
+    query_word_count = Counter(query.split())
+    similarities = Counter()
+    base_dir = 'drive/MyDrive/Test Data/'
+    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
+        dict_from_json = json.load(json_file)
+    inverted_body = inverted_index_colab.InvertedIndex.read_index(base_dir + 'body_index', 'index_text')
+    for term in query.split():
+        posting_list = read_posting_list(inverted_body, term, base_dir + 'body_index')
+        idf = math.log2(N/inverted_body.df[term])
+        for id_tf_pair in posting_list:
+            tf = (id_tf_pair[1]/dict_from_json[str(id_tf_pair[0])][1])
+            weight = tf * idf
+            similarities[id_tf_pair[0]] += (weight * query_word_count[term])
+
+
+    '''if normalizing documents is neccessary'''
+    # for doc_id, sim in similarities.items():
+    #     similarities[doc_id] = (sim * (1/len(query)) * (1/dict_from_json[str(doc_id)][1]))
+
+
+
     # END SOLUTION
-    return res
+    return similarities.most_common(100)
 
 
 def search_title(query):
@@ -76,9 +100,15 @@ def search_title(query):
         return res
     # BEGIN SOLUTION
 
+    base_dir = 'drive/MyDrive/Test Data/'
+
+    base_dir = 'drive/MyDrive/Test Data/'
+    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
+        dict_from_json = json.load(json_file)
+
     posting_lists = get_posting_lists(query, 'index_title', base_dir='drive/MyDrive/Test Data/title_index')
     # each element is (id,tf) and we want it to be --> (id,title)
-    res = list(map(lambda x: tuple((x[0], wikipedia.page(pageid=x[0], auto_suggest=True, redirect=True).title)), posting_lists))
+    res = list(map(lambda x: tuple((x[0], dict_from_json[str(x[0])][0])), posting_lists))
 
     # END SOLUTION
     return res
@@ -106,9 +136,12 @@ def search_anchor(query):
 
     # BEGIN SOLUTION
 
+    base_dir = 'drive/MyDrive/Test Data/'
+    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
+        dict_from_json = json.load(json_file)
     posting_lists = get_posting_lists(query, 'index_anchor', base_dir='drive/MyDrive/Test Data/anchor_index')
     # each element is (id,tf) and we want it to be --> (id,title)
-    res = list(map(lambda x: tuple((x[0], wikipedia.page(pageid=x[0], auto_suggest=True, redirect=True).title)), posting_lists))
+    res = list(map(lambda x: tuple((x[0], dict_from_json[str(x[0])][0])), posting_lists))
 
     # END SOLUTION
 

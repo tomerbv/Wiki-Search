@@ -1,11 +1,9 @@
 import csv
 import gzip
+import json
 import pickle
 import time
 import Indexing.inverted_index_colab as inverted_index
-
-from contextlib import closing
-
 
 def test_page_view():
     t = time.time()
@@ -14,10 +12,12 @@ def test_page_view():
         wid2pv = pickle.loads(f.read())
     data_items = wid2pv.items()
     data_list = list(data_items)
-    print(len(data_list))
+    print(data_list[:100])
     print(f"total time: {time.time() - t}")
+    print(len(data_list))
 
-# test_page_view()
+
+test_page_view()
 
 def test_page_rank():
     t = time.time()
@@ -34,4 +34,17 @@ def test_page_rank():
     print(res)
     print(page_rank[int(row[0])])
     print(time.time() - t)
-test_page_rank()
+
+# test_page_rank()
+
+def test_doc_index():
+    t = time.time()
+    path = 'D:/University/semster e/Data Restoration/Project/Final data/id_title_len_dict.json'
+    with open(path) as json_file:
+        dict_from_json = json.load(json_file)
+
+    print(list(dict_from_json.items())[:100])
+    print(time.time() - t)
+
+
+# print(test_doc_index())
