@@ -29,3 +29,10 @@ def get_value(folder_path, name, id):
     with open(Path(folder_path + name + index), 'rb') as f:
         wid2pv = pickle.loads(f.read())
     return wid2pv[id]
+
+
+def get_dict(folder_path, name, id):
+    index = str(bin_index_hash(id))
+    with open(Path(folder_path + name + index), 'rb') as f:
+        wid2pv = pickle.loads(f.read())
+    return wid2pv

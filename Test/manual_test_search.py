@@ -6,6 +6,7 @@ import pickle
 from collections import Counter
 from pathlib import Path
 import inverted_index_colab
+import hashed_index
 import wikipedia
 from contextlib import closing
 
@@ -57,24 +58,28 @@ def search_body(query):
 
     query_word_count = Counter(query.split())
     similarities = Counter()
-    base_dir = 'drive/MyDrive/Test Data/'
-    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
-        dict_from_json = json.load(json_file)
-    inverted_body = inverted_index_colab.InvertedIndex.read_index(base_dir + 'body_index', 'index_text')
+    body_index_path = 'drive/MyDrive/Test Data/body_index'
+    id_len_path = 'drive/MyDrive/Test Data/id_len/'
+
+    id_len_dict = {}
+    bucket_access = [False for i in range(101)]
+
+    inverted_body = inverted_index_colab.InvertedIndex.read_index(body_index_path, 'index_text')
     for term in query.split():
-        posting_list = read_posting_list(inverted_body, term, base_dir + 'body_index')
+        posting_list = read_posting_list(inverted_body, term, body_index_path)
         idf = math.log2(N/inverted_body.df[term])
-        for id_tf_pair in posting_list:
-            tf = (id_tf_pair[1]/dict_from_json[str(id_tf_pair[0])][1])
+        for id, fr in posting_list:
+            if not bucket_access[hashed_index.bin_index_hash(id)]:
+                id_len_dict.update(hashed_index.get_dict(id_len_path, 'id_len.pkl', id))
+                bucket_access[hashed_index.bin_index_hash(id)] = True
+            tf = (fr/id_len_dict[id])
             weight = tf * idf
-            similarities[id_tf_pair[0]] += (weight * query_word_count[term])
+            similarities[id] += (weight * query_word_count[term])
 
 
     '''if normalizing documents is neccessary'''
     # for doc_id, sim in similarities.items():
     #     similarities[doc_id] = (sim * (1/len(query)) * (1/dict_from_json[str(doc_id)][1]))
-
-
 
     # END SOLUTION
     return similarities.most_common(100)
@@ -100,15 +105,19 @@ def search_title(query):
         return res
     # BEGIN SOLUTION
 
-    base_dir = 'drive/MyDrive/Test Data/'
+    title_index_path = 'drive/MyDrive/Test Data/title_index'
+    id_name_path = 'drive/MyDrive/Test Data/id_name/'
 
-    base_dir = 'drive/MyDrive/Test Data/'
-    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
-        dict_from_json = json.load(json_file)
+    posting_lists = get_posting_lists(query, 'index_title', base_dir=title_index_path)
+    names_dict = {}
+    bucket_access = [False for i in range(101)]
+    for i in posting_lists:
+        if not bucket_access[hashed_index.bin_index_hash(i[0])]:
+            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name.pkl', i[0]))
+            bucket_access[hashed_index.bin_index_hash(i[0])] = True
 
-    posting_lists = get_posting_lists(query, 'index_title', base_dir='drive/MyDrive/Test Data/title_index')
     # each element is (id,tf) and we want it to be --> (id,title)
-    res = list(map(lambda x: tuple((x[0], dict_from_json[str(x[0])][0])), posting_lists))
+    res = list(map(lambda x: tuple((x[0], names_dict[x[0]])), posting_lists))
 
     # END SOLUTION
     return res
@@ -136,12 +145,19 @@ def search_anchor(query):
 
     # BEGIN SOLUTION
 
-    base_dir = 'drive/MyDrive/Test Data/'
-    with open(base_dir + 'doc_info_index/id_title_len_dict.json') as json_file:
-        dict_from_json = json.load(json_file)
-    posting_lists = get_posting_lists(query, 'index_anchor', base_dir='drive/MyDrive/Test Data/anchor_index')
+    anchor_index_path = 'drive/MyDrive/Test Data/anchor_index'
+    id_name_path = 'drive/MyDrive/Test Data/id_name/'
+
+    posting_lists = get_posting_lists(query, 'index_anchor', base_dir=anchor_index_path)
+    names_dict = {}
+    bucket_access = [False for i in range(101)]
+    for i in posting_lists:
+        if not bucket_access[hashed_index.bin_index_hash(i[0])]:
+            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name.pkl', i[0]))
+            bucket_access[hashed_index.bin_index_hash(i[0])] = True
+
     # each element is (id,tf) and we want it to be --> (id,title)
-    res = list(map(lambda x: tuple((x[0], dict_from_json[str(x[0])][0])), posting_lists))
+    res = list(map(lambda x: tuple((x[0], names_dict[x[0]])), posting_lists))
 
     # END SOLUTION
 
@@ -165,18 +181,19 @@ def get_pagerank(wiki_ids):
     if len(wiki_ids) == 0:
         return res
     # BEGIN SOLUTION
-    page_rank = {}
-    fileName = 'drive/MyDrive/Test Data/page_rank.csv.gz'
-    with gzip.open(fileName, "rt") as csvFile:
-        csvreader = csv.reader(csvFile)
-        for row in csvreader:
-            page_rank[int(row[0])] = (float(row[1]))
 
-    res = list(map(lambda x: (x,page_rank[x]) if x in page_rank else (x,0), wiki_ids))
-    res.sort(key=lambda x: x[1], reverse=True)
+    pr_path = 'drive/MyDrive/Test Data/pr/'
+
+    page_rank = {}
+    bucket_access = [False for i in range(101)]
+    for id in wiki_ids:
+        if not bucket_access[hashed_index.bin_index_hash(id)]:
+            page_rank.update(hashed_index.get_dict(pr_path, 'pr.pkl', id))
+            bucket_access[hashed_index.bin_index_hash(id)] = True
+
+    res = sorted(list(map(lambda x: (x, page_rank[x]) , wiki_ids)),key=lambda x: x[1], reverse=True)
 
     # END SOLUTION
-    # return (id, page rank)
     return res
 
 
@@ -201,17 +218,18 @@ def get_pageview(wiki_ids):
         return res
     # BEGIN SOLUTION
 
-    fileName = 'drive/MyDrive/Test Data/pv/pageviews-202108-user.pkl'
-    with open(fileName, 'rb') as f:
-        wid2pv = pickle.loads(f.read())
-        for id in wiki_ids:
-            res.append(wid2pv[id])
+    pv_path = 'drive/MyDrive/Test Data/pv/'
 
-    res = list(map(lambda x: (x, wid2pv[x]) if x in wid2pv else (x, 0), wiki_ids))
-    res.sort(key=lambda x: float(x[1]), reverse=True)
+    page_view = {}
+    bucket_access = [False for i in range(101)]
+    for id in wiki_ids:
+        if not bucket_access[hashed_index.bin_index_hash(id)]:
+            page_view.update(hashed_index.get_dict(pv_path, 'pv.pkl', id))
+            bucket_access[hashed_index.bin_index_hash(id)] = True
+
+    res = sorted(list(map(lambda x: (x, page_view[x]), wiki_ids)), key=lambda x: x[1], reverse=True)
 
     # END SOLUTION
-    # return (id, page view)
     return res
 
 
