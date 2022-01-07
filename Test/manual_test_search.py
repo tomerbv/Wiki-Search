@@ -1,13 +1,7 @@
-import csv
-import gzip
-import json
 import math
-import pickle
 from collections import Counter
-from pathlib import Path
 import inverted_index_colab
 import hashed_index
-import wikipedia
 from contextlib import closing
 
 
@@ -31,6 +25,7 @@ def search(query):
     if len(query) == 0:
         return res
     # BEGIN SOLUTION
+
 
     # END SOLUTION
     return res
@@ -62,7 +57,7 @@ def search_body(query):
     id_len_path = 'drive/MyDrive/Test Data/id_len/'
 
     id_len_dict = {}
-    bucket_access = [False for i in range(101)]
+    bucket_access = [False for i in range(2521)]
 
     inverted_body = inverted_index_colab.InvertedIndex.read_index(body_index_path, 'index_text')
     for term in query.split():
@@ -70,7 +65,7 @@ def search_body(query):
         idf = math.log2(N/inverted_body.df[term])
         for id, fr in posting_list:
             if not bucket_access[hashed_index.bin_index_hash(id)]:
-                id_len_dict.update(hashed_index.get_dict(id_len_path, 'id_len.pkl', id))
+                id_len_dict.update(hashed_index.get_dict(id_len_path, 'id_len', id))
                 bucket_access[hashed_index.bin_index_hash(id)] = True
             tf = (fr/id_len_dict[id])
             weight = tf * idf
@@ -110,10 +105,10 @@ def search_title(query):
 
     posting_lists = get_posting_lists(query, 'index_title', base_dir=title_index_path)
     names_dict = {}
-    bucket_access = [False for i in range(101)]
+    bucket_access = [False for i in range(2521)]
     for i in posting_lists:
         if not bucket_access[hashed_index.bin_index_hash(i[0])]:
-            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name.pkl', i[0]))
+            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name', i[0]))
             bucket_access[hashed_index.bin_index_hash(i[0])] = True
 
     # each element is (id,tf) and we want it to be --> (id,title)
@@ -150,10 +145,10 @@ def search_anchor(query):
 
     posting_lists = get_posting_lists(query, 'index_anchor', base_dir=anchor_index_path)
     names_dict = {}
-    bucket_access = [False for i in range(101)]
+    bucket_access = [False for i in range(2521)]
     for i in posting_lists:
         if not bucket_access[hashed_index.bin_index_hash(i[0])]:
-            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name.pkl', i[0]))
+            names_dict.update(hashed_index.get_dict(id_name_path, 'id_name', i[0]))
             bucket_access[hashed_index.bin_index_hash(i[0])] = True
 
     # each element is (id,tf) and we want it to be --> (id,title)
@@ -185,7 +180,7 @@ def get_pagerank(wiki_ids):
     pr_path = 'drive/MyDrive/Test Data/pr/'
 
     page_rank = {}
-    bucket_access = [False for i in range(101)]
+    bucket_access = [False for i in range(2521)]
     for id in wiki_ids:
         if not bucket_access[hashed_index.bin_index_hash(id)]:
             page_rank.update(hashed_index.get_dict(pr_path, 'pr.pkl', id))
@@ -221,7 +216,7 @@ def get_pageview(wiki_ids):
     pv_path = 'drive/MyDrive/Test Data/pv/'
 
     page_view = {}
-    bucket_access = [False for i in range(101)]
+    bucket_access = [False for i in range(2521)]
     for id in wiki_ids:
         if not bucket_access[hashed_index.bin_index_hash(id)]:
             page_view.update(hashed_index.get_dict(pv_path, 'pv.pkl', id))
@@ -272,4 +267,3 @@ def read_posting_list(inverted, w, base_dir=''):
             return posting_list
         except:
             return []
-
