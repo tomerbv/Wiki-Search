@@ -3,6 +3,22 @@ from collections import Counter
 import inverted_index_colab
 import hashed_index
 from contextlib import closing
+import re
+from nltk.corpus import stopwords
+
+def tokenize(query):
+    english_stopwords = frozenset(stopwords.words('english'))
+    corpus_stopwords = ["category", "references", "also", "external", "links",
+                        "may", "first", "see", "history", "people", "one", "two",
+                        "part", "thumb", "including", "second", "following",
+                        "many", "however", "would", "became"]
+
+    all_stopwords = english_stopwords.union(corpus_stopwords)
+    RE_WORD = re.compile(r"""[\#\@\w](['\-]?\w){2,24}""", re.UNICODE)
+
+    tokens = [token.group() for token in RE_WORD.finditer(query.lower())]
+    return [token for token in tokens if token not in all_stopwords]
+
 
 
 def search(query):
@@ -25,6 +41,8 @@ def search(query):
     if len(query) == 0:
         return res
     # BEGIN SOLUTION
+
+    query = tokenize(query)
 
 
     # END SOLUTION
@@ -51,7 +69,9 @@ def search_body(query):
         return res
     # BEGIN SOLUTION
 
-    query_word_count = Counter(query.split())
+    query = tokenize(query)
+
+    query_word_count = Counter(query)
     similarities = Counter()
     body_index_path = 'drive/MyDrive/Test Data/body_index'
     id_len_path = 'drive/MyDrive/Test Data/id_len/'
@@ -60,7 +80,7 @@ def search_body(query):
     bucket_access = [False for i in range(2521)]
 
     inverted_body = inverted_index_colab.InvertedIndex.read_index(body_index_path, 'index_text')
-    for term in query.split():
+    for term in query:
         posting_list = read_posting_list(inverted_body, term, body_index_path)
         idf = math.log2(N/inverted_body.df[term])
         for id, fr in posting_list:
@@ -99,6 +119,8 @@ def search_title(query):
     if len(query) == 0:
         return res
     # BEGIN SOLUTION
+
+    query = tokenize(query)
 
     title_index_path = 'drive/MyDrive/Test Data/title_index'
     id_name_path = 'drive/MyDrive/Test Data/id_name/'
@@ -139,6 +161,8 @@ def search_anchor(query):
         return res
 
     # BEGIN SOLUTION
+
+    query = tokenize(query)
 
     anchor_index_path = 'drive/MyDrive/Test Data/anchor_index'
     id_name_path = 'drive/MyDrive/Test Data/id_name/'
@@ -183,7 +207,7 @@ def get_pagerank(wiki_ids):
     bucket_access = [False for i in range(2521)]
     for id in wiki_ids:
         if not bucket_access[hashed_index.bin_index_hash(id)]:
-            page_rank.update(hashed_index.get_dict(pr_path, 'pr.pkl', id))
+            page_rank.update(hashed_index.get_dict(pr_path, 'pr', id))
             bucket_access[hashed_index.bin_index_hash(id)] = True
 
     res = sorted(list(map(lambda x: (x, page_rank[x]) , wiki_ids)),key=lambda x: x[1], reverse=True)
@@ -219,7 +243,7 @@ def get_pageview(wiki_ids):
     bucket_access = [False for i in range(2521)]
     for id in wiki_ids:
         if not bucket_access[hashed_index.bin_index_hash(id)]:
-            page_view.update(hashed_index.get_dict(pv_path, 'pv.pkl', id))
+            page_view.update(hashed_index.get_dict(pv_path, 'pv', id))
             bucket_access[hashed_index.bin_index_hash(id)] = True
 
     res = sorted(list(map(lambda x: (x, page_view[x]), wiki_ids)), key=lambda x: x[1], reverse=True)
@@ -238,7 +262,7 @@ def get_posting_lists(query, index_name, base_dir=''):
 
     inverted_title = inverted_index_colab.InvertedIndex.read_index(base_dir, index_name)
     posting_lists = []
-    for word in query.split():
+    for word in query:
         posting_list = read_posting_list(inverted_title, word, base_dir)
         posting_lists += posting_list
 

@@ -27,12 +27,12 @@ def write_a_dictionary(id_value, folder_path, name):
 def get_value(folder_path, name, id):
     index = str(bin_index_hash(id))
     with open(Path(folder_path + name + index + '.pkl'), 'rb') as f:
-        wid2pv = pickle.loads(f.read())
+        wid2pv = pickle.load(f)
     return wid2pv[id]
 
 
 def get_dict(folder_path, name, id):
     index = str(bin_index_hash(id))
     with open(Path(folder_path + name + index + '.pkl'), 'rb') as f:
-        wid2pv = pickle.loads(f.read())
+        wid2pv = pickle.load(f)
     return wid2pv
