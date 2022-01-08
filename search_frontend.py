@@ -1,5 +1,3 @@
-from collections import Counter
-from contextlib import closing
 from flask import Flask, request, jsonify
 import math
 from collections import Counter
@@ -23,13 +21,13 @@ class MyFlaskApp(Flask):
         self.id_name_path = '/content/id_name/'
         self.id_len_path = '/content/id_len/'
 
-        # body_index_path = 'drive/MyDrive/Test Data/body_index'
-        # title_index_path = 'drive/MyDrive/Test Data/title_index'
-        # anchor_index_path = 'drive/MyDrive/Test Data/anchor_index'
-        # pr_path = 'drive/MyDrive/Test Data/pr/'
-        # pv_path = 'drive/MyDrive/Test Data/pv/'
-        # id_name_path = 'drive/MyDrive/Test Data/id_name/'
-        # id_len_path = 'drive/MyDrive/Test Data/id_len/'
+        # self.body_index_path = 'drive/MyDrive/Test Data/body_index'
+        # self.title_index_path = 'drive/MyDrive/Test Data/title_index'
+        # self.anchor_index_path = 'drive/MyDrive/Test Data/anchor_index'
+        # self.pr_path = 'drive/MyDrive/Test Data/pr/'
+        # self.pv_path = 'drive/MyDrive/Test Data/pv/'
+        # self.id_name_path = 'drive/MyDrive/Test Data/id_name/'
+        # self.id_len_path = 'drive/MyDrive/Test Data/id_len/'
         self.index_body = inverted_index_colab.InvertedIndex.read_index(self.body_index_path, 'index_text')
         self.index_title = inverted_index_colab.InvertedIndex.read_index(self.title_index_path, 'index_title')
         self.index_anchor = inverted_index_colab.InvertedIndex.read_index(self.anchor_index_path, 'index_anchor')
@@ -71,27 +69,28 @@ def search():
 
     SERVER_DOMAIN = request.host_url[7:]
     # BEGIN SOLUTION
-    CALLED_BY = True
+
+    app.CALLED_BY = True
 
     # TODO: threading might be possible
-    body_res = requests.get('http://' + SERVER_DOMAIN + 'search_body?query=' + query)
-    title_res = requests.get('http://' + SERVER_DOMAIN + 'search_title?query=' + query)
-    anchor_res = requests.get('http://' + SERVER_DOMAIN + 'search_anchor?query=' + query)
+    body_res = search_body(query)
+    title_res = search_title(query)
+    anchor_res = search_anchor(query)
 
     id_ranking = Counter()
     for i in range(len(body_res)):
-        id_ranking[body_res[i][0]] += 2/i
+        id_ranking[body_res[i][0]] += 2/(i+1)
 
     # TODO: find weight for title and anchor
-    for i in range(len(title_res)):
-        id_ranking[title_res[i][0]] += 1
+    # for i in range(len(title_res)):
+    #     id_ranking[title_res[i][0]] += 1
 
     for i in range(len(anchor_res)):
         id_ranking[anchor_res[i][0]] += 1
 
     ids = list(id_ranking.keys())
-    requests.post('http://' + SERVER_DOMAIN + '/get_pagerank', json=ids)
-    requests.post('http://' + SERVER_DOMAIN + '/get_pageview', json=ids)
+    get_pagerank(ids)
+    get_pageview(ids)
 
     # TODO: find weight for pr and pv
     for id in ids:
@@ -102,20 +101,20 @@ def search():
         if pv <= 10:
             id_ranking[id] = id_ranking[id] * math.log10(pv)
 
-    res = sorted(list(map(lambda x: (x, app.id_name_dict[x]), ids)), key=lambda x: x[0], reverse=True)
+    res = sorted(list(map(lambda x: (x, app.id_name_dict[x]), ids)), key=lambda x: x[1], reverse=True)
     # END SOLUTION
 
     app.id_len_dict.clear()
     app.id_name_dict.clear()
     app.id_pr_dict.clear()
     app.id_pv_dict.clear()
-    CALLED_BY = False
+    app.CALLED_BY = False
 
     return jsonify(res)
 
 
 @app.route("/search_body")
-def search_body():
+def search_body(query=None):
     ''' Returns up to a 100 search results for the query using TFIDF AND COSINE
         SIMILARITY OF THE BODY OF ARTICLES ONLY. DO NOT use stemming. DO USE the
         staff-provided tokenizer from Assignment 3 (GCP part) to do the
@@ -130,9 +129,12 @@ def search_body():
         element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
+    if query is None:
+        query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     query = tokenize(query)
@@ -160,12 +162,13 @@ def search_body():
     if not app.CALLED_BY:
         app.id_len_dict.clear()
         app.id_name_dict.clear()
+        return jsonify(res)
 
-    return jsonify(res)
+    return res
 
 
 @app.route("/search_title")
-def search_title():
+def search_title(query=None):
     ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
         IN THE TITLE of articles, ordered in descending order of the NUMBER OF
         QUERY WORDS that appear in the title. For example, a document with a
@@ -181,29 +184,32 @@ def search_title():
         worst where each element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
+    if query is None:
+        query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
+    query = tokenize(query)
     posting_lists = get_posting_lists(app.index_title, query, base_dir=app.title_index_path)
-    return jsonify(posting_lists)
     for id, value in posting_lists:
         if id not in app.id_name_dict:
             app.id_name_dict.update(hashed_index.get_dict(app.id_name_path, 'id_name', id))
 
-    if not app.CALLED_BY:
-        res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
+    res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
 
     # END SOLUTION
     if not app.CALLED_BY:
         app.id_name_dict.clear()
+        return jsonify(res)
 
-    return jsonify(res)
+    return res
 
 
 @app.route("/search_anchor")
-def search_anchor():
+def search_anchor(query=None):
     ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
         IN THE ANCHOR TEXT of articles, ordered in descending order of the
         NUMBER OF QUERY WORDS that appear in anchor text linking to the page.
@@ -220,28 +226,32 @@ def search_anchor():
         worst where each element is a tuple (wiki_id, title).
     '''
     res = []
-    query = request.args.get('query', '')
+    if query is None:
+        query = request.args.get('query', '')
     if len(query) == 0:
-        return jsonify(res)
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
+    query = tokenize(query)
     posting_lists = get_posting_lists(app.index_anchor, query, base_dir=app.anchor_index_path)
     for id, value in posting_lists:
         if id not in app.id_name_dict:
             app.id_name_dict.update(hashed_index.get_dict(app.id_name_path, 'id_name', id))
 
-    if not app.CALLED_BY:
-        res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
+    res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
 
     # END SOLUTION
     if not app.CALLED_BY:
         app.id_name_dict.clear()
+        return jsonify(res)
 
-    return jsonify(res)
+    return res
 
 
 @app.route("/get_pagerank", methods=['POST'])
-def get_pagerank():
+def get_pagerank(wiki_ids=None):
     ''' Returns PageRank values for a list of provided wiki article IDs.
         Test this by issuing a POST request to a URL like:
           http://YOUR_SERVER_DOMAIN/get_pagerank
@@ -256,9 +266,12 @@ def get_pagerank():
           list of PageRank scores that correrspond to the provided article IDs.
     '''
     res = []
-    wiki_ids = request.get_json()
+    if wiki_ids is None:
+        wiki_ids = request.get_json()
     if len(wiki_ids) == 0:
-        return jsonify(res)
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     for id in wiki_ids:
@@ -270,12 +283,13 @@ def get_pagerank():
     # END SOLUTION
     if not app.CALLED_BY:
         app.id_pr_dict.clear()
+        return jsonify(res)
 
-    return jsonify(res)
+    return res
 
 
 @app.route("/get_pageview", methods=['POST'])
-def get_pageview():
+def get_pageview(wiki_ids=None):
     ''' Returns the number of page views that each of the provide wiki articles
         had in August 2021.
         Test this by issuing a POST request to a URL like:
@@ -292,9 +306,12 @@ def get_pageview():
           provided list article IDs.
     '''
     res = []
-    wiki_ids = request.get_json()
+    if wiki_ids is None:
+        wiki_ids = request.get_json()
     if len(wiki_ids) == 0:
-        return jsonify(res)
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
     # BEGIN SOLUTION
 
     for id in wiki_ids:
