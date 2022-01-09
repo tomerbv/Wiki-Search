@@ -1,47 +1,49 @@
 from flask import Flask, request, jsonify
 import math
 from collections import Counter
-import inverted_index_colab
+import inverted_index_gcp
 import hashed_index
 from contextlib import closing
 import re
 from nltk.corpus import stopwords
-import requests
-
+import nltk
+import threading
 
 class MyFlaskApp(Flask):
     def run(self, host=None, port=None, debug=None, **options):
 
         self.N = 6348910
-        self.body_index_path = '/content/body_index'
-        self.title_index_path = '/content/title_index'
-        self.anchor_index_path = '/content/anchor_index'
-        self.pr_path = '/content/pr/'
-        self.pv_path = '/content/pv/'
-        self.id_name_path = '/content/id_name/'
-        self.id_len_path = '/content/id_len/'
 
-        # self.body_index_path = 'drive/MyDrive/Test Data/body_index'
-        # self.title_index_path = 'drive/MyDrive/Test Data/title_index'
-        # self.anchor_index_path = 'drive/MyDrive/Test Data/anchor_index'
-        # self.pr_path = 'drive/MyDrive/Test Data/pr/'
-        # self.pv_path = 'drive/MyDrive/Test Data/pv/'
-        # self.id_name_path = 'drive/MyDrive/Test Data/id_name/'
-        # self.id_len_path = 'drive/MyDrive/Test Data/id_len/'
-        self.index_body = inverted_index_colab.InvertedIndex.read_index(self.body_index_path, 'index_text')
-        self.index_title = inverted_index_colab.InvertedIndex.read_index(self.title_index_path, 'index_title')
-        self.index_anchor = inverted_index_colab.InvertedIndex.read_index(self.anchor_index_path, 'index_anchor')
-        self.id_len_dict = {}
-        self.id_name_dict = {}
-        self.id_pr_dict = {}
-        self.id_pv_dict = {}
+        self.body_index_path = 'postings_gcp'
+        self.title_index_path = 'title_index'
+        self.anchor_index_path = 'anchor_index'
+        self.pr_path = 'pr/'
+        self.pv_path = 'pv/'
+        self.id_name_path = 'id_name/'
+        self.id_len_path = 'id_len/'
+
+        self.index_body = inverted_index_gcp.InvertedIndex.read_index(self.body_index_path, 'index')
+        self.index_title = inverted_index_gcp.InvertedIndex.read_index(self.title_index_path, 'title_index')
+        self.index_anchor = inverted_index_gcp.InvertedIndex.read_index(self.anchor_index_path, 'anchor_index')
+
+        self.id_len_dict = hashed_index.get_all(app.id_len_path)
+        self.id_name_dict = hashed_index.get_all(app.id_name_path)
+        self.id_pr_dict = hashed_index.get_all(app.pr_path)
+        self.id_pv_dict = hashed_index.get_all(app.pv_path)
+
+        self.body_res = []
+        self.title_res = []
+        self.anchor_res = []
+
+
+
         self.CALLED_BY = False
 
         super(MyFlaskApp, self).run(host=host, port=port, debug=debug, **options)
 
 
 app = MyFlaskApp(__name__)
-
+nltk.download('stopwords')
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
 
@@ -70,44 +72,59 @@ def search():
     SERVER_DOMAIN = request.host_url[7:]
     # BEGIN SOLUTION
 
-    app.CALLED_BY = True
+    # TODO:
 
-    # TODO: threading might be possible
-    body_res = search_body(query)
-    title_res = search_title(query)
-    anchor_res = search_anchor(query)
+
+    app.CALLED_BY = True
+    body_thread = threading.Thread(search_body(),args=query)
+    body_thread.start()
+    title_thread = threading.Thread(search_title(), args=query)
+    title_thread.start()
+    anchor_thread = threading.Thread(search_anchor(),args=query)
+    anchor_thread.start()
+
+
 
     id_ranking = Counter()
-    for i in range(len(body_res)):
-        id_ranking[body_res[i][0]] += 2/(i+1)
+    body_thread.join()
+    for i in range(len(app.body_res)):
+        id_ranking[app.body_res[i][0]] += 20/((3*i)+1)
 
-    # TODO: find weight for title and anchor
-    # for i in range(len(title_res)):
-    #     id_ranking[title_res[i][0]] += 1
+    title_thread.join()
+    for i in range(len(app.title_res)):
+        id_ranking[app.title_res[i][0]] += 50/((3*i)+1)
 
-    for i in range(len(anchor_res)):
-        id_ranking[anchor_res[i][0]] += 1
+    anchor_thread.join()
+    for i in range(len(app.anchor_res)):
+        id_ranking[app.anchor_res[i][0]] += 40/((3*i)+1)
 
     ids = list(id_ranking.keys())
-    get_pagerank(ids)
-    get_pageview(ids)
 
-    # TODO: find weight for pr and pv
     for id in ids:
-        pr = app.id_pr_dict[id]
-        pv = app.id_pv_dict[id]
-        if pr <= 2:
-            id_ranking[id] = id_ranking[id] * math.log2(pr)
-        if pv <= 10:
+        try:
+            pr = app.id_pr_dict[id]
+        except:
+            pr = 1
+        try:
+            pv = math.sqrt(app.id_pv_dict[id])
+        except:
+            pv = 1
+        if pr > 10:
+            id_ranking[id] = id_ranking[id] * math.log10(pr)
+        if pv > 10:
             id_ranking[id] = id_ranking[id] * math.log10(pv)
 
-    res = sorted(list(map(lambda x: (x, app.id_name_dict[x]), ids)), key=lambda x: x[1], reverse=True)
-    # END SOLUTION
+    for id, value in id_ranking.most_common(100):
+        try:
+            res.append((id, app.id_name_dict[id]))
+        except:
+            continue
 
-    app.id_len_dict.clear()
-    app.id_name_dict.clear()
-    app.id_pr_dict.clear()
-    app.id_pv_dict.clear()
+    # END SOLUTION
+    app.body_res = []
+    app.title_res = []
+    app.anchor_res = []
+
     app.CALLED_BY = False
 
     return jsonify(res)
@@ -145,26 +162,28 @@ def search_body(query=None):
         posting_list = read_posting_list(app.index_body, term, app.body_index_path)
         idf = math.log2(app.N / app.index_body.df[term])
         for id, fr in posting_list:
-            if id not in app.id_len_dict:
-                app.id_len_dict.update(hashed_index.get_dict(app.id_len_path, 'id_len', id))
-            tf = (fr / app.id_len_dict[id])
+            if id in app.id_len_dict:
+                pl = app.id_len_dict[id]
+                tf = (fr/pl)
+            else:
+                tf = 0
             weight = tf * idf
             similarities[id] += (weight * query_word_count[term])
 
-    res = similarities.most_common(100)
-    for id, score in res:
-        if id not in app.id_name_dict:
-            app.id_name_dict.update(hashed_index.get_dict(app.id_name_path, 'id_name', id))
+    most = similarities.most_common(100)
 
-    res = list(map(lambda x: (x[0], app.id_name_dict[x[0]]), res))
+    for id, value in most:
+        try:
+            res.append((id,app.id_name_dict[id]))
+        except:
+            continue
 
     # END SOLUTION
     if not app.CALLED_BY:
-        app.id_len_dict.clear()
-        app.id_name_dict.clear()
         return jsonify(res)
 
-    return res
+    app.body_res = res
+    return
 
 
 @app.route("/search_title")
@@ -194,18 +213,19 @@ def search_title(query=None):
 
     query = tokenize(query)
     posting_lists = get_posting_lists(app.index_title, query, base_dir=app.title_index_path)
-    for id, value in posting_lists:
-        if id not in app.id_name_dict:
-            app.id_name_dict.update(hashed_index.get_dict(app.id_name_path, 'id_name', id))
 
-    res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
+    for id, value in posting_lists:
+        try:
+            res.append((id,app.id_name_dict[id]))
+        except:
+            continue
 
     # END SOLUTION
     if not app.CALLED_BY:
-        app.id_name_dict.clear()
         return jsonify(res)
 
-    return res
+    app.title_res = res
+    return
 
 
 @app.route("/search_anchor")
@@ -237,17 +257,17 @@ def search_anchor(query=None):
     query = tokenize(query)
     posting_lists = get_posting_lists(app.index_anchor, query, base_dir=app.anchor_index_path)
     for id, value in posting_lists:
-        if id not in app.id_name_dict:
-            app.id_name_dict.update(hashed_index.get_dict(app.id_name_path, 'id_name', id))
-
-    res = list(map(lambda x: tuple((x[0], app.id_name_dict[x[0]])), posting_lists))
+        try:
+            res.append((id,app.id_name_dict[id]))
+        except:
+            continue
 
     # END SOLUTION
     if not app.CALLED_BY:
-        app.id_name_dict.clear()
         return jsonify(res)
 
-    return res
+    app.anchor_res = res
+    return
 
 
 @app.route("/get_pagerank", methods=['POST'])
@@ -275,17 +295,16 @@ def get_pagerank(wiki_ids=None):
     # BEGIN SOLUTION
 
     for id in wiki_ids:
-        if id not in app.id_pr_dict:
-            app.id_pr_dict.update(hashed_index.get_dict(app.pr_path, 'pr', id))
-
-    res = (list(map(lambda x: app.id_pr_dict[x], wiki_ids)))
+        try:
+            res.append((id, app.id_pr_dict[id]))
+        except:
+            continue
 
     # END SOLUTION
-    if not app.CALLED_BY:
-        app.id_pr_dict.clear()
-        return jsonify(res)
 
-    return res
+    return jsonify(res)
+
+
 
 
 @app.route("/get_pageview", methods=['POST'])
@@ -315,16 +334,15 @@ def get_pageview(wiki_ids=None):
     # BEGIN SOLUTION
 
     for id in wiki_ids:
-        if id not in app.id_pv_dict:
-            app.id_pv_dict.update(hashed_index.get_dict(app.pv_path, 'pv', id))
-
-    res = (list(map(lambda x: app.id_pv_dict[x], wiki_ids)))
+        try:
+            res.append((id, app.id_pv_dict[id]))
+        except:
+            continue
 
     # END SOLUTION
-    if not app.CALLED_BY:
-        app.id_pv_dict.clear()
 
     return jsonify(res)
+
 
 
 def get_posting_lists(inverted_index, query, base_dir=''):
@@ -352,7 +370,7 @@ TF_MASK = 2 ** 16 - 1  # Masking the 16 low bits of an integer
 
 
 def read_posting_list(inverted, w, base_dir=''):
-    with closing(inverted_index_colab.MultiFileReader()) as reader:
+    with closing(inverted_index_gcp.MultiFileReader()) as reader:
         try:
             locs = inverted.posting_locs[w]
             new_locs = [tuple((base_dir + '/' + locs[0][0], locs[0][1]))]
@@ -383,4 +401,4 @@ def tokenize(query):
 
 if __name__ == '__main__':
     # run the Flask RESTful API, make the server publicly available (host='0.0.0.0') on port 8080
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import pickle
 
@@ -36,3 +37,14 @@ def get_dict(folder_path, name, id):
     with open(Path(folder_path + name + index + '.pkl'), 'rb') as f:
         wid2pv = pickle.load(f)
     return wid2pv
+
+
+def get_all(folder_path):
+    res = {}
+    for file in os.listdir(folder_path):
+        filename = os.fsdecode(file)
+        if filename.endswith(".pkl"):
+            with open(Path(folder_path + filename), 'rb') as f:
+                res.update(pickle.load(f))
+
+    return res

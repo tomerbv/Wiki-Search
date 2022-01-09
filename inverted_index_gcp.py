@@ -1,18 +1,9 @@
-import pyspark
-import sys
-from collections import Counter, OrderedDict
+from collections import Counter
 import itertools
-from itertools import islice, count, groupby
-import pandas as pd
-import os
-import re
-from operator import itemgetter
-from time import time
 from pathlib import Path
 import pickle
 from google.cloud import storage
-from collections import defaultdict
-from contextlib import closing
+
 
 
 # Let's start with a small block size of 30 bytes just to test things out. 
@@ -31,7 +22,7 @@ class MultiFileWriter:
         self.bucket = self.client.bucket(bucket_name)
         
     
-    def write(self, b):
+    def write(self, b, folder):
         locs = []
         while len(b) > 0:
             pos = self._f.tell()
@@ -39,7 +30,7 @@ class MultiFileWriter:
         # if the current file is full, close and open a new one.
             if remaining == 0:  
                 self._f.close()
-                self.upload_to_gcp()                
+                self.upload_to_gcp(folder)
                 self._f = next(self._file_gen)
                 pos, remaining = 0, BLOCK_SIZE
             self._f.write(b[:remaining])
@@ -50,12 +41,12 @@ class MultiFileWriter:
     def close(self):
         self._f.close()
     
-    def upload_to_gcp(self):
+    def upload_to_gcp(self,folder):
         '''
             The function saves the posting files into the right bucket in google storage.
         '''
         file_name = self._f.name
-        blob = self.bucket.blob(f"postings_gcp/{file_name}")
+        blob = self.bucket.blob(f"{folder}/{file_name}")
         blob.upload_from_filename(file_name)
 
         
@@ -178,7 +169,7 @@ class InvertedIndex:
 
 
     @staticmethod
-    def write_a_posting_list(b_w_pl, bucket_name):
+    def write_a_posting_list(b_w_pl, bucket_name, folder):
         posting_locs = defaultdict(list)
         bucket_id, list_w_pl = b_w_pl
         
@@ -188,21 +179,21 @@ class InvertedIndex:
                 b = b''.join([(doc_id << 16 | (tf & TF_MASK)).to_bytes(TUPLE_SIZE, 'big')
                               for doc_id, tf in pl])
                 # write to file(s)
-                locs = writer.write(b)
+                locs = writer.write(b, folder)
                 # save file locations to index
                 posting_locs[w].extend(locs)
-            writer.upload_to_gcp() 
-            InvertedIndex._upload_posting_locs(bucket_id, posting_locs, bucket_name)
+            writer.upload_to_gcp(folder)
+            InvertedIndex._upload_posting_locs(bucket_id, posting_locs, bucket_name, folder)
         return bucket_id
 
     
     @staticmethod
-    def _upload_posting_locs(bucket_id, posting_locs, bucket_name):
+    def _upload_posting_locs(bucket_id, posting_locs, bucket_name, folder):
         with open(f"{bucket_id}_posting_locs.pickle", "wb") as f:
             pickle.dump(posting_locs, f)
         client = storage.Client()
         bucket = client.bucket(bucket_name)
-        blob_posting_locs = bucket.blob(f"postings_gcp/{bucket_id}_posting_locs.pickle")
+        blob_posting_locs = bucket.blob(f"{folder}/{bucket_id}_posting_locs.pickle")
         blob_posting_locs.upload_from_filename(f"{bucket_id}_posting_locs.pickle")
     
 
