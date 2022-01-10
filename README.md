@@ -23,5 +23,53 @@ this file is the base of our engine and is a class that we use to create and use
 
 ### search_frontend 
 this is the file that runs the engine. in this file we use all our data and methods to perform evaluations that when given a query will help us return the
-most releveant wikipedia pages
+most releveant wikipedia pages. 
+
+
+## Explanation on funcionality
+A query is given using a Url which holds the ip that the engine is running on. in the url the method wanted and the query are stated.
+after pressing enter the app runs the method stated. this are the possible methods.
+
+### search_body
+this method tokenizes the query first. then it iterates over the terms and with the posting list of each
+term, recieved by the inverted index that was built from the body of each document, it calculates its tf-idf and cosign similarity for each relevant document.
+then it returns the 100 highest scoring documents for all the terms in the query.
+
+### search_title-
+this method tokenizes the query first. then it iterates over the queries and with the posting list of each
+term,recieved by the inverted index that was built from the title of each document returns the 100 highest scoring documents for all the terms in the query.
+
+### search_anchor-
+this method tokenizes the query first. then it iterates over the queries and with the posting list of each
+term,recieved by the inverted index that was built from the anchor_text of each document returns the 100 highest scoring documents for all the terms in the query.
+
+
+### get_pageview-
+his method iterates over the id's and with the page view dictionary it returns the pairing page view for all the terms in the query.
+
+### get_pagerank-
+this method iterates over the id's and with the page rank dictionary it returns the pairing page rank for all the terms in the query.
+
+### search - 
+this is the main function and the most recommemded to use , this method is multithreaded and uses all the methods above with another method( instead of the body methos)
+to calculate the best documents the engine should return. the method gives weights to each result of the methods and with this it finds its optimal list of id's of doucments
+to return.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
