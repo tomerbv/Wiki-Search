@@ -71,7 +71,6 @@ def search():
 
     # BEGIN SOLUTION
 
-    # TODO: README
 
     app.CALLED_BY = True
 
