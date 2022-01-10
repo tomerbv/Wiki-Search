@@ -1,7 +1,7 @@
 import math
 from collections import Counter
 import inverted_index_colab
-import hashed_index
+from Indexing import hashed_index
 from contextlib import closing
 import re
 from nltk.corpus import stopwords
