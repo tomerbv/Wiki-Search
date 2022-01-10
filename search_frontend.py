@@ -35,6 +35,8 @@ class MyFlaskApp(Flask):
         self.title_res = []
         self.anchor_res = []
 
+        self.stemmer = nltk.PorterStemmer()
+
 
 
         self.CALLED_BY = False
@@ -72,31 +74,35 @@ def search():
     SERVER_DOMAIN = request.host_url[7:]
     # BEGIN SOLUTION
 
-    # TODO:
+    # TODO: README
+    # TODO: REPORT
+    # TODO: test page rank and page view
+    # TODO: extra model
+
+
 
 
     app.CALLED_BY = True
-    body_thread = threading.Thread(search_body(),args=query)
+
+    body_thread = threading.Thread(search_BM25(),args=query)
     body_thread.start()
     title_thread = threading.Thread(search_title(), args=query)
     title_thread.start()
     anchor_thread = threading.Thread(search_anchor(),args=query)
     anchor_thread.start()
 
-
-
     id_ranking = Counter()
     body_thread.join()
     for i in range(len(app.body_res)):
-        id_ranking[app.body_res[i][0]] += 20/((3*i)+1)
+        id_ranking[app.body_res[i][0]] += 60/((2*i)+1)
 
     title_thread.join()
     for i in range(len(app.title_res)):
-        id_ranking[app.title_res[i][0]] += 50/((3*i)+1)
+        id_ranking[app.title_res[i][0]] += 40/((3*i)+1)
 
     anchor_thread.join()
     for i in range(len(app.anchor_res)):
-        id_ranking[app.anchor_res[i][0]] += 40/((3*i)+1)
+        id_ranking[app.anchor_res[i][0]] += 35/((3*i)+1)
 
     ids = list(id_ranking.keys())
 
@@ -128,6 +134,49 @@ def search():
     app.CALLED_BY = False
 
     return jsonify(res)
+
+@app.route("/search_BM25")
+def search_BM25(query=None):
+    res = []
+    if query is None:
+        query = request.args.get('query', '')
+    if len(query) == 0:
+        if not app.CALLED_BY:
+            return jsonify(res)
+        return res
+    # BEGIN SOLUTION
+
+    query = tokenize(query)
+    similarities = Counter()
+
+    b = 0.75
+    k1 = 1.2
+    avgpl = 320
+    for term in query:
+        posting_list = read_posting_list(app.index_body, term, app.body_index_path)
+        if posting_list:
+            df = app.index_body.df[term]
+            idf = math.log((app.N - df + 0.5) / (df + 0.5) + 1)
+            for id, tf in posting_list:
+                if id in app.id_len_dict:
+                    pl = app.id_len_dict[id]
+                    similarities[id] += idf * ((tf * (k1 + 1) / (tf + k1 * (1 - b + (b * (pl / avgpl))))))
+
+    most = similarities.most_common(100)
+
+    for id, value in most:
+        try:
+            res.append((id, app.id_name_dict[id]))
+        except:
+            continue
+
+    # END SOLUTION
+    if not app.CALLED_BY:
+        return jsonify(res)
+
+    app.body_res = res
+    return
+
 
 
 @app.route("/search_body")
@@ -212,6 +261,11 @@ def search_title(query=None):
     # BEGIN SOLUTION
 
     query = tokenize(query)
+    for word in query:
+        stemmed = app.stemmer.stem(word)
+        if stemmed not in query:
+            query.append(stemmed)
+
     posting_lists = get_posting_lists(app.index_title, query, base_dir=app.title_index_path)
 
     for id, value in posting_lists:
@@ -255,6 +309,11 @@ def search_anchor(query=None):
     # BEGIN SOLUTION
 
     query = tokenize(query)
+    for word in query:
+        stemmed = app.stemmer.stem(word)
+        if stemmed not in query:
+            query.append(stemmed)
+
     posting_lists = get_posting_lists(app.index_anchor, query, base_dir=app.anchor_index_path)
     for id, value in posting_lists:
         try:
