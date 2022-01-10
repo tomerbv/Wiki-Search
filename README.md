@@ -18,9 +18,6 @@ a folder that holds the google colab files that we used to test the engine befor
 ### Writers
 this folder files that are not used to run the engine. this files hold google colab pages that show an idea we had of how to hold the data effiecently in the disk
 
-### hashed_index
-like the above files an idea we had before we understood how to save the data more effiecently
-
 ### inverted_index_gcp
 this file is the base of our engine and is a class that we use to create and use our indexes
 
