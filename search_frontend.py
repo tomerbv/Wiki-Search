@@ -11,6 +11,9 @@ import threading
 
 class MyFlaskApp(Flask):
     def run(self, host=None, port=None, debug=None, **options):
+        ''' in run initialization we  load the relevant indexes to the RAM memory for faster access
+            and better reusing of addresses and such.
+        '''
 
         self.N = 6348910
 
@@ -49,16 +52,13 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
 @app.route("/search")
 def search():
-    ''' Returns up to a 100 of your best search results for the query. This is
-        the place to put forward your best search engine, and you are free to
-        implement the retrieval whoever you'd like within the bound of the
-        project requirements (efficiency, quality, etc.). That means it is up to
-        you to decide on whether to use stemming, remove stopwords, use
-        PageRank, query expansion, etc.
-        To issue a query navigate to a URL like:
-         http://YOUR_SERVER_DOMAIN/search?query=hello+world
-        where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.
+    '''
+    search method is multithreaded and uses customed weights on the results of the different search methods
+    to return a final accumulated result.
+    first it sets CALLED_BY to True and by doing so lets the other search methods know they are utility methods
+    and by that should not return any value, only update the global values.
+    later it runs threads for each search method and iterates through their results, weighting them accordingly.
+    lastly it weights in the page rank and page view, clears the global results and returns the final result.
     Returns:
     --------
         list of up to 100 search results, ordered from best to worst where each
@@ -127,6 +127,10 @@ def search():
 
 
 def search_BM25(query=None):
+    ''' exactly the same as search body method only the similarity method used here is BM25
+        and not the classic tf-idf and cosine similarity.
+        the method is a utility method for search.
+    '''
     res = []
     if query is None:
         query = request.args.get('query', '')
@@ -171,14 +175,9 @@ def search_BM25(query=None):
 
 @app.route("/search_body")
 def search_body(query=None):
-    ''' Returns up to a 100 search results for the query using TFIDF AND COSINE
-        SIMILARITY OF THE BODY OF ARTICLES ONLY. DO NOT use stemming. DO USE the
-        staff-provided tokenizer from Assignment 3 (GCP part) to do the
-        tokenization and remove stopwords.
-        To issue a query navigate to a URL like:
-         http://YOUR_SERVER_DOMAIN/search_body?query=hello+world
-        where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.
+    ''' this method tokenizes the query first. then it iterates over the queries and with the posting list of each
+        term and it calculates it cosign similarity for each relevant document.
+        then it returns the 100 highest scoring documents for all the terms in the query.
     Returns:
     --------
         list of up to 100 search results, ordered from best to worst where each
@@ -227,15 +226,8 @@ def search_body(query=None):
 
 @app.route("/search_title")
 def search_title(query=None):
-    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
-        IN THE TITLE of articles, ordered in descending order of the NUMBER OF
-        QUERY WORDS that appear in the title. For example, a document with a
-        title that matches two of the query words will be ranked before a
-        document with a title that matches only one query term.
-        Test this by navigating to the a URL like:
-         http://YOUR_SERVER_DOMAIN/search_title?query=hello+world
-        where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.[]
+    ''' this method tokenizes the query first. then it iterates over the queries and with the posting list of each
+        term and rturns the 100 highest scoring documents for all the terms in the query.
     Returns:
     --------
         list of ALL (not just top 100) search results, ordered from best to
@@ -274,16 +266,8 @@ def search_title(query=None):
 
 @app.route("/search_anchor")
 def search_anchor(query=None):
-    ''' Returns ALL (not just top 100) search results that contain A QUERY WORD
-        IN THE ANCHOR TEXT of articles, ordered in descending order of the
-        NUMBER OF QUERY WORDS that appear in anchor text linking to the page.
-        For example, a document with a anchor text that matches two of the
-        query words will be ranked before a document with anchor text that
-        matches only one query term.
-        Test this by navigating to the a URL like:
-         http://YOUR_SERVER_DOMAIN/search_anchor?query=hello+world
-        where YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.
+    ''' this method tokenizes the query first. then it iterates over the queries and with the posting list of each
+        term and rturns the 100 highest scoring documents for all the terms in the query.
     Returns:
     --------
         list of ALL (not just top 100) search results, ordered from best to
@@ -321,14 +305,8 @@ def search_anchor(query=None):
 
 @app.route("/get_pagerank", methods=['POST'])
 def get_pagerank(wiki_ids=None):
-    ''' Returns PageRank values for a list of provided wiki article IDs.
-        Test this by issuing a POST request to a URL like:
-          http://YOUR_SERVER_DOMAIN/get_pagerank
-        with a json payload of the list of article ids. In python do:
-          import requests
-          requests.post('http://YOUR_SERVER_DOMAIN/get_pagerank', json=[1,5,8])
-        As before YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.
+    ''' this method iterates over the id's and with the page rank dictionary it returns the
+        pairing page rank for all the terms in the query.
     Returns:
     --------
         list of floats:
@@ -345,7 +323,7 @@ def get_pagerank(wiki_ids=None):
 
     for id in wiki_ids:
         try:
-            res.append((id, app.id_pr_dict[id]))
+            res.append(app.id_pr_dict[id])
         except:
             continue
 
@@ -358,15 +336,8 @@ def get_pagerank(wiki_ids=None):
 
 @app.route("/get_pageview", methods=['POST'])
 def get_pageview(wiki_ids=None):
-    ''' Returns the number of page views that each of the provide wiki articles
-        had in August 2021.
-        Test this by issuing a POST request to a URL like:
-          http://YOUR_SERVER_DOMAIN/get_pageview
-        with a json payload of the list of article ids. In python do:
-          import requests
-          requests.post('http://YOUR_SERVER_DOMAIN/get_pageview', json=[1,5,8])
-        As before YOUR_SERVER_DOMAIN is something like XXXX-XX-XX-XX-XX.ngrok.io
-        if you're using ngrok on Colab or your external IP on GCP.
+    ''' this method iterates over the id's and with the page view dictionary it returns the
+        pairing page view for all the terms in the query.
     Returns:
     --------
         list of ints:
@@ -384,7 +355,7 @@ def get_pageview(wiki_ids=None):
 
     for id in wiki_ids:
         try:
-            res.append((id, app.id_pv_dict[id]))
+            res.append(app.id_pv_dict[id])
         except:
             continue
 
@@ -435,6 +406,10 @@ def read_posting_list(inverted, w, base_dir=''):
 
 
 def tokenize(query):
+    """
+    :param query: string - the query provided
+    :return: list of tokens after removing stopwords and punctuation
+    """
     english_stopwords = frozenset(stopwords.words('english'))
     corpus_stopwords = ["category", "references", "also", "external", "links",
                         "may", "first", "see", "history", "people", "one", "two",
