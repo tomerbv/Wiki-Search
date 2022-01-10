@@ -84,15 +84,15 @@ def search():
     id_ranking = Counter()
     body_thread.join()
     for i in range(len(app.body_res)):
-        id_ranking[app.body_res[i][0]] += 120/((2*i)+1)
+        id_ranking[app.body_res[i][0]] += 80/(i+1)
 
     title_thread.join()
     for i in range(len(app.title_res)):
-        id_ranking[app.title_res[i][0]] += 60/((6*i)+1)
+        id_ranking[app.title_res[i][0]] += 5
 
     anchor_thread.join()
     for i in range(len(app.anchor_res)):
-        id_ranking[app.anchor_res[i][0]] += 30/((6*i)+1)
+        id_ranking[app.anchor_res[i][0]] += 3.5
 
     ids = list(id_ranking.keys())
 
@@ -125,7 +125,7 @@ def search():
 
     return jsonify(res)
 
-
+@app.route("/search_BM25")
 def search_BM25(query=None):
     ''' exactly the same as search body method only the similarity method used here is BM25
         and not the classic tf-idf and cosine similarity.
@@ -143,8 +143,8 @@ def search_BM25(query=None):
     query = tokenize(query)
     similarities = Counter()
 
-    b = 0.75
-    k1 = 1.2
+    b = 0.25
+    k1 = 0.3
     avgpl = 320
     for term in query:
         posting_list = read_posting_list(app.index_body, term, app.body_index_path)
