@@ -16,7 +16,7 @@ a folder holding a google colab page which shows the evaluation of the data that
 a folder that holds the google colab files that we used to test the engine before we ran it on google cloud platform. we first checked how are engine works with a small corpus of about 20,000 documents in contrast to the large corpus which holds about 6,3000,000 documnets
 
 ### Writers
-this folder files that are not used to run the engine. this files hold google colab pages that show an idea we had of how to hold the data effiecently in the disk
+a folder files that are not used to run the engine. this files hold google colab pages that show an idea we had of how to hold the data effiecently in the disk
 
 ### inverted_index_gcp
 this file is the base of our engine and is a class that we use to create and use our indexes
