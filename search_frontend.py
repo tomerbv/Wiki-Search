@@ -37,8 +37,6 @@ class MyFlaskApp(Flask):
 
         self.stemmer = nltk.PorterStemmer()
 
-
-
         self.CALLED_BY = False
 
         super(MyFlaskApp, self).run(host=host, port=port, debug=debug, **options)
@@ -71,16 +69,9 @@ def search():
     if len(query) == 0:
         return jsonify(res)
 
-    SERVER_DOMAIN = request.host_url[7:]
     # BEGIN SOLUTION
 
     # TODO: README
-    # TODO: REPORT
-    # TODO: test page rank and page view
-    # TODO: extra model
-
-
-
 
     app.CALLED_BY = True
 
@@ -94,21 +85,21 @@ def search():
     id_ranking = Counter()
     body_thread.join()
     for i in range(len(app.body_res)):
-        id_ranking[app.body_res[i][0]] += 60/((2*i)+1)
+        id_ranking[app.body_res[i][0]] += 120/((2*i)+1)
 
     title_thread.join()
     for i in range(len(app.title_res)):
-        id_ranking[app.title_res[i][0]] += 40/((3*i)+1)
+        id_ranking[app.title_res[i][0]] += 60/((6*i)+1)
 
     anchor_thread.join()
     for i in range(len(app.anchor_res)):
-        id_ranking[app.anchor_res[i][0]] += 35/((3*i)+1)
+        id_ranking[app.anchor_res[i][0]] += 30/((6*i)+1)
 
     ids = list(id_ranking.keys())
 
     for id in ids:
         try:
-            pr = app.id_pr_dict[id]
+            pr = math.sqrt(app.id_pr_dict[id])
         except:
             pr = 1
         try:
@@ -118,7 +109,7 @@ def search():
         if pr > 10:
             id_ranking[id] = id_ranking[id] * math.log10(pr)
         if pv > 10:
-            id_ranking[id] = id_ranking[id] * math.log10(pv)
+            id_ranking[id] = id_ranking[id] * math.log2(pv)
 
     for id, value in id_ranking.most_common(100):
         try:
@@ -135,7 +126,7 @@ def search():
 
     return jsonify(res)
 
-@app.route("/search_BM25")
+
 def search_BM25(query=None):
     res = []
     if query is None:
